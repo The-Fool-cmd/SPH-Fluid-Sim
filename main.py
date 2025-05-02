@@ -1,6 +1,6 @@
 import pygame
 import pygame_gui
-from simulation import ParticleSystem
+from simulation_mat import ParticleSystem
 from ui_console import setup_ui, get_ui_values
 """
 import cProfile
@@ -9,7 +9,7 @@ import io
 """
 
 pygame.init()
-WINDOW_WIDTH, WINDOW_HEIGHT = 1000, 600
+WINDOW_WIDTH, WINDOW_HEIGHT = 1600, 1200
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("SPH Prototype")
 clock = pygame.time.Clock()
@@ -39,8 +39,8 @@ while running:
         if event.type == pygame.USEREVENT:
             if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                 if event.ui_element == ui_state['start_button']:
-                    particles.apply_random_kick()
                     simulation_started = True
+                    particles.apply_random_kick()
                     print("Simulation started")
                 elif event.ui_element == ui_state['apply_button']:
                     count, size, spacing = get_ui_values(ui_state)
@@ -53,8 +53,10 @@ while running:
 
     pygame.draw.rect(screen, (50, 50, 50), ui_state['sim_area_rect'], width=2)
 
+    substeps = 2
     if simulation_started:
-        particles.update(time_delta)
+        for _ in range(substeps):
+            particles.update(time_delta / substeps)
     particles.draw(screen)
 
     font = pygame.font.SysFont("consolas", 16)

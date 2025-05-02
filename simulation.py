@@ -7,30 +7,6 @@ CUBIC_SPLINE_CONSTANT = 10.0 # Adjusted constant for cubic spline kernel
 DRAG = 0.995 # Drag coefficient for velocity damping
 
 class SmoothingKernel:
-    """
-    UNSTABLE AS FUCK, DO NOT USE THESE
-    @staticmethod
-    def poly6(dst, radius):
-        if dst >= radius:
-            return 0.0
-        factor = 315 / (64 * np.pi * radius ** 9)
-        return factor * (radius ** 2 - dst ** 2) ** 3
-    
-    @staticmethod
-    def spiky_gradient(r_vec, radius):
-        dst = np.linalg.norm(r_vec)
-        if dst == 0 or dst >= radius:
-            return np.zeros(2)
-        factor = -45 / (np.pi * radius ** 6)
-        return factor * (radius - dst) ** 2 * (r_vec / dst)
-
-    @staticmethod
-    def viscosity_laplacian(dst, radius):
-        if dst >= radius:
-            return 0.0
-        factor = 45 / (np.pi * radius ** 6)
-        return factor * (radius - dst)
-    """
     @staticmethod
     def cubic_spline(dst, radius):
         value = max(0.0, radius ** 2 - dst ** 2)
@@ -109,6 +85,7 @@ class Particle:
     def update(self, bounds, dt):
         self.vel += self.force * dt / self.density  # mass = 1
         # print(self.density)
+        #self.vel += np.array([0, 10], dtype=np.float32) * dt
         self.vel *= DRAG  # Apply drag to the velocity
         self.pos += self.vel
 
