@@ -3,7 +3,7 @@ import pygame
 import cupy as cp
 
 # Hardcoded constants
-PRESSURE_CONSTANT = 500000000.0  # The backbone of this entire thing
+PRESSURE_CONSTANT = 1e10
 DRAG = 0.998  # Drag coefficient for velocity damping
 
 class ParticleSystem:
@@ -21,7 +21,7 @@ class ParticleSystem:
 
         # SPH constants
         self._calculate_sph_constants(count, width, height)
-        self.smoothing_length = radius * 2 # Adjusted smoothing length for better interaction
+        self.smoothing_length = radius * 10 # OVERWRITE VALUE IN _calculate_sph_constants
         # Initialize positions
         self._init_positions_grid(spacing)
 
@@ -30,7 +30,9 @@ class ParticleSystem:
         particle_spacing = area_per_particle ** 0.5
 
         self.smoothing_length = particle_spacing  # tune as needed
+        """DEBUGGING
         print(f"Particle spacing: {particle_spacing}, Smoothing length: {self.smoothing_length}")
+        """
 
         self.cubic_volume = cp.pi * self.smoothing_length ** 8 / 4.0
         w0 = (self.smoothing_length ** 2) ** 3 / self.cubic_volume
@@ -47,8 +49,8 @@ class ParticleSystem:
             x = start_x + col * spacing
             y = start_y + row * spacing
             if x < self.bounds[0] and y < self.bounds[1]:
-                self.positions[i] = cp.array([x, y])\
-    
+                self.positions[i] = cp.array([x, y])
+
     def xsph_correction(self):
         """Apply XSPH velocity smoothing to prevent endless particle bouncing."""
         eps = 0.05  # smoothing strength (small)
@@ -67,9 +69,12 @@ class ParticleSystem:
         self.update_density()
         self.update_pressure()
         self.update_forces()
-        self.clamp_velocities()
+        #self.clamp_velocities()
         self.xsph_correction()
         self.integrate(dt)
+        """DEBUGGING
+        print(self.densities.get())
+        """
 
     def apply_random_kick(self, magnitude=0.5):
         """Apply random initial velocities to all particles."""
@@ -87,7 +92,7 @@ class ParticleSystem:
             # Normalize speed
             t = min(speed / max_speed, 1.0)
 
-            # Map speed to color: blue (cold) → red (hot)
+            # Map speed to color: blue (cold), red (hot)
             r = int(255 * t)
             g = int(255 * (1 - t))
             b = int(255 * (1 - t))
@@ -104,16 +109,14 @@ class ParticleSystem:
         return normalization * result
 
     def kernel_gradient(self, r_vec, r_norm):
-        """Spiky Kernel Gradient for pressure force"""
         factor = -45.0 / (cp.pi * self.smoothing_length**6)
         scalar = (self.smoothing_length - r_norm)**2
-        scalar = scalar[:, None]  # <-- ADD THIS LINE
+        scalar = scalar[:, None]  # ???
         grad = factor * scalar * (r_vec / (r_norm[:, None] + 1e-8))
         grad = cp.where(r_norm[:, None] < self.smoothing_length, grad, 0)
         return grad
 
     def kernel_laplacian(self, r_norm):
-        """Viscosity Kernel Laplacian for viscosity force"""
         factor = 45.0 / (cp.pi * self.smoothing_length**6)
         lap = factor * (self.smoothing_length - r_norm)
         lap = cp.where(r_norm < self.smoothing_length, lap, 0)
@@ -127,12 +130,13 @@ class ParticleSystem:
         density_contributions = self.kernel(dists) * mask
 
         self.densities = cp.sum(density_contributions, axis=1)
-
-        # FIX: Prevent extremely low densities
-        self.densities = cp.maximum(self.densities, 1.0)
-
+        """DEBUGGING
         if cp.any(self.densities < 1e-2):
             print(f"[WARNING] Extremely low density detected! Min density: {cp.min(self.densities).get()}")
+        """
+        self.densities = cp.maximum(self.densities, 1.0)
+
+        
 
 
     def update_pressure(self):
@@ -157,7 +161,8 @@ class ParticleSystem:
         force_viscosity = viscosity_coefficient * cp.sum(vel_diffs * lap_w[:, :, None] / densities_product[:, :, None], axis=1)
 
         # Gravity force
-        gravity = cp.array([0, 400.0], dtype=cp.float32)
+        gravity_strength = 0.0
+        gravity = cp.array([0, gravity_strength], dtype=cp.float32)
         gravity_forces = self.densities[:, None] * gravity
 
         # Final sum

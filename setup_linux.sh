@@ -15,5 +15,8 @@ echo "Installing dependencies..."
 pip install --upgrade pip
 pip install pygame==2.6.1 pygame_gui==0.6.3 numpy
 
+echo "Installing cupy for CUDA 12.x..."
+pip install cupy-cuda12x
+
 echo "Running main.py..."
 python3 main.py
