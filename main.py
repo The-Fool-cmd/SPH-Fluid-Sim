@@ -10,7 +10,7 @@ import io
 
 def main():
     pygame.init()
-    WINDOW_WIDTH, WINDOW_HEIGHT = 1600, 1200
+    WINDOW_WIDTH, WINDOW_HEIGHT = 1000, 700
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
     pygame.display.set_caption("SPH Prototype")
     clock = pygame.time.Clock()
@@ -25,7 +25,7 @@ def main():
 
     running = True
     simulation_started = False
-    fps_update_timer = 0  # Add this at the top of the file
+    fps_update_timer = 0
 
     # Initialize fps_text with a default value before the main loop
     fps_text = pygame.font.SysFont("consolas", 16).render("FPS: 0", True, (255, 255, 255))

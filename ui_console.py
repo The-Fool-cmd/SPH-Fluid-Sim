@@ -5,7 +5,7 @@ def setup_ui(manager, window_width, window_height):
     panel_width = 300
     panel_rect = pygame.Rect(window_width - panel_width, 0, panel_width, window_height)
 
-    # Add a flag to avoid unnecessary UI updates
+    # Flag to avoid unnecessary UI updates
     ui_update_needed = False
 
     panel = pygame_gui.elements.UIPanel(

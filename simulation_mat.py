@@ -3,8 +3,8 @@ import pygame
 import cupy as cp
 
 # Hardcoded constants
-PRESSURE_CONSTANT = 1e10
-DRAG = 0.998  # Drag coefficient for velocity damping
+PRESSURE_CONSTANT = 5e8
+DRAG = 0.9985  # Drag coefficient for velocity damping
 
 class ParticleSystem:
     def __init__(self, count, radius, spacing, width, height):
@@ -12,7 +12,7 @@ class ParticleSystem:
         self.radius = radius
         self.bounds = (width, height)
 
-        # GPU arrays
+        # GPU matrixes
         self.positions = cp.zeros((count, 2), dtype=cp.float32)
         self.velocities = cp.zeros((count, 2), dtype=cp.float32)
         self.forces = cp.zeros((count, 2), dtype=cp.float32)
@@ -86,26 +86,27 @@ class ParticleSystem:
         velocities_np = self.velocities.get()
         speeds = np.linalg.norm(velocities_np, axis=1)
 
-        max_speed = 500.0
+        max_speed = np.max(speeds)
+        min_speed = np.min(speeds)
 
-        for pos, speed in zip(positions_np, speeds):
-            # Normalize speed
-            t = min(speed / max_speed, 1.0)
+        # Normalize speeds and compute colors in a vectorized way
+        t = (speeds - min_speed) / (max_speed - min_speed + 1e-8)
+        colors = np.stack([
+            (255 * t).astype(np.uint8),               # Red channel
+            (255 * (1 - t)).astype(np.uint8),         # Green channel
+            (255 * (1 - t)).astype(np.uint8)          # Blue channel
+        ], axis=1)
 
-            # Map speed to color: blue (cold), red (hot)
-            r = int(255 * t)
-            g = int(255 * (1 - t))
-            b = int(255 * (1 - t))
-
-            pygame.draw.circle(screen, (r, g, b), pos.astype(int), int(self.radius))
-
-
+        # Draw all particles using Pygame
+        for pos, color in zip(positions_np, colors):
+            pygame.draw.circle(screen, color.tolist(), pos.astype(int), int(self.radius))
     # --- GPU SPH Operations ---
 
     def kernel(self, r):
         """Poly6 Kernel"""
         result = cp.maximum(0.0, (self.smoothing_length**2 - r**2))**3
         normalization = 315.0 / (64.0 * cp.pi * self.smoothing_length**9)
+        # normalization = 1
         return normalization * result
 
     def kernel_gradient(self, r_vec, r_norm):
@@ -136,9 +137,6 @@ class ParticleSystem:
         """
         self.densities = cp.maximum(self.densities, 1.0)
 
-        
-
-
     def update_pressure(self):
         self.pressures = cp.maximum(0, PRESSURE_CONSTANT * (self.densities - self.rest_density))
 
@@ -157,7 +155,7 @@ class ParticleSystem:
         # Viscosity force
         vel_diffs = self.velocities[:, None, :] - self.velocities[None, :, :]
         lap_w = self.kernel_laplacian(dists)
-        viscosity_coefficient = 5.0
+        viscosity_coefficient = 5e5
         force_viscosity = viscosity_coefficient * cp.sum(vel_diffs * lap_w[:, :, None] / densities_product[:, :, None], axis=1)
 
         # Gravity force
