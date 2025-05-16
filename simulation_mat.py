@@ -3,8 +3,8 @@ import pygame
 import cupy as cp
 
 # Hardcoded constants
-PRESSURE_CONSTANT = 5e8
-DRAG = 0.9985  # Drag coefficient for velocity damping
+PRESSURE_CONSTANT = 1e9
+DRAG = 0.998  # Drag coefficient for velocity damping
 
 class ParticleSystem:
     def __init__(self, count, radius, spacing, width, height):
@@ -22,6 +22,7 @@ class ParticleSystem:
         # SPH constants
         self._calculate_sph_constants(count, width, height)
         self.smoothing_length = radius * 10 # OVERWRITE VALUE IN _calculate_sph_constants
+        print("Rest density: ", self.rest_density)
         # Initialize positions
         self._init_positions_grid(spacing)
 
@@ -36,7 +37,7 @@ class ParticleSystem:
 
         self.cubic_volume = cp.pi * self.smoothing_length ** 8 / 4.0
         w0 = (self.smoothing_length ** 2) ** 3 / self.cubic_volume
-        self.rest_density = 20.0 * w0  # tune as needed
+        self.rest_density = 3e2 * w0  # tune as needed
 
     def _init_positions_grid(self, spacing):
         grid_w = int(cp.sqrt(self.N))
@@ -52,8 +53,8 @@ class ParticleSystem:
                 self.positions[i] = cp.array([x, y])
 
     def xsph_correction(self):
-        """Apply XSPH velocity smoothing to prevent endless particle bouncing."""
-        eps = 0.05  # smoothing strength (small)
+        """XSPH velocity smoothing to prevent endless particle bouncing. Doesn't rly work atm..."""
+        eps = 0.1  # smoothing strength
         diffs = self.positions[:, None, :] - self.positions[None, :, :]
         dists = cp.linalg.norm(diffs, axis=2) + 1e-8
 
@@ -69,12 +70,12 @@ class ParticleSystem:
         self.update_density()
         self.update_pressure()
         self.update_forces()
-        #self.clamp_velocities()
-        self.xsph_correction()
+        #self.clamp_velocities() # unnecessarry
+        #self.xsph_correction() # doesn't work?
         self.integrate(dt)
-        """DEBUGGING
-        print(self.densities.get())
-        """
+        #DEBUGGING
+        #print(self.densities.get())
+        
 
     def apply_random_kick(self, magnitude=0.5):
         """Apply random initial velocities to all particles."""
@@ -130,12 +131,12 @@ class ParticleSystem:
         mask = dists < self.smoothing_length
         density_contributions = self.kernel(dists) * mask
 
-        self.densities = cp.sum(density_contributions, axis=1)
+        self.densities = cp.sum(density_contributions, axis=1) * 1e5 
         """DEBUGGING
         if cp.any(self.densities < 1e-2):
             print(f"[WARNING] Extremely low density detected! Min density: {cp.min(self.densities).get()}")
         """
-        self.densities = cp.maximum(self.densities, 1.0)
+        self.densities = cp.maximum(self.densities, 1e-3)
 
     def update_pressure(self):
         self.pressures = cp.maximum(0, PRESSURE_CONSTANT * (self.densities - self.rest_density))
